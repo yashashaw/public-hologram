@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hologram demo results</title>
+<style>
+body { margin: 0 auto; max-width: 1000px; padding: 24px 16px 64px; background: #fcfcfb; color: #0b0b0b;
+       font: 16px/1.55 system-ui, sans-serif; }
+h1 { margin-bottom: 4px; } h2 { margin-top: 48px; } h3 { margin: 20px 0 2px; font-size: 16px; }
+p, li, dd { color: #52514e; } img { max-width: 100%; height: auto; display: block; margin: 16px 0; }
+.table-wrap { overflow-x: auto; } table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+td, th { padding: 6px 8px; border-bottom: 1px solid #e4e3df; text-align: left; vertical-align: top; }
+dl { display: grid; grid-template-columns: 170px 1fr; gap: 6px 16px; } dt { font-weight: 600; } dd { margin: 0; }
+code { font-size: 14px; }
+@media (max-width: 560px) { dl { grid-template-columns: 1fr; } dd { margin-bottom: 8px; } }
+</style></head><body>
+<h1>Hologram demo results</h1>
+<p>A walkthrough of one run on invented terrain. The question: if a drone is trying not to be detected on its way
+to a defended asset, which route does it fly, and where should the defender add radars to make even that route costly?</p>
+
+<h2>How to read the maps</h2>
+<p>Every map shows the same 32 km &times; 32 km square, divided into
+102,400 cells of 100 m. Nothing on them describes a real place.</p>
+<dl>
+<dt>Left edge (black bar)</dt><dd>The starting points. A route may enter at any of the 320 cells on this edge.</dd>
+<dt>Orange star</dt><dd>The defended asset, which every route is trying to reach.</dd>
+<dt>Orange line</dt><dd>A cheapest route. The orange dot on the left edge is where it enters.</dd>
+<dt>Black triangle</dt><dd>A radar that already exists.</dd>
+<dt>Black circle</dt><dd>A radar the optimizer chose to add.</dd>
+<dt>Blue shading</dt><dd>Darker always means more: more detection, more forest, or more cost, as each map's title says.</dd>
+</dl>
+
+<h2>1. The inputs</h2>
+<img src="01_scene.png" alt="Four maps: terrain, radar detection, forest concealment and combined cost">
+<p>From left to right:</p>
+<h3>Terrain and fixed radars</h3>
+<p>A shaded-relief view of the generated elevation. Two ridges run north to south, each with one low pass, and the
+triangles are the 6 existing radars.</p>
+<h3>Radar detection</h3>
+<p>How likely a drone flying 15 m above the ground is to be seen. A ray is traced from each
+antenna to every cell within 12 km, and the cell only counts if terrain and earth curvature
+don't block the line. Detection then fades with range. The sharp white areas are <strong>terrain shadows</strong> behind the ridges.</p>
+<h3>Forest concealment</h3>
+<p>Generated forest cover, which makes a cell cheaper to fly through.</p>
+<h3>Combined cost</h3>
+<p>The single surface that the search runs on. Each cell's cost per metre is
+<code>0.10 + 0.40 &times; noise exposure + 0.20 &times; (1 &minus; forest) + 2.0 &times; detection</code>.
+Noise exposure rises near generated towns. Radar has by far the largest weight because being detected is the worst outcome.
+A route's total cost is this value summed along its length, so it is a unitless exposure score.</p>
+
+<h2>2. The flood: reverse Dijkstra</h2>
+<img src="flood.gif" alt="Animation of a cost wave spreading from the defended asset across the terrain">
+<p>This animation is a <strong>reverse Dijkstra search</strong>. It is "reverse" because it starts at the destination
+(the defended asset, near the right edge) and works outward, instead of starting from the entry points.</p>
+<p>The search keeps a priority queue of cells and always finalizes the unfinished cell that is cheapest to reach. It
+then checks that cell's 8 neighbours and records which neighbour gave each one its best cost. Grey has not been reached
+yet, and blue has, with darker blue costing more. The front races through shadows and crawls through radar coverage,
+because each frame shows a higher cost limit and cheap cells fit under it from much farther away.</p>
+<p>The payoff is that <strong>one flood answers all 320 entry points</strong>. Moving between two cells
+costs the same in either direction, so the cost outward from the asset is exactly what a drone flying inward would pay.
+The orange line in the last frames is the cheapest route of all.</p>
+
+<h2>3. The finished flood and its routes</h2>
+<img src="02_flood.png" alt="Map of cost to reach the asset with cheapest routes from several entry points">
+<p>Each cell now shows the cost of the cheapest route from there to the asset, so it is lightest around the star. The
+white contour lines join cells of equal cost, like height lines on a hiking map.</p>
+<p>To draw a route, the code starts at an entry cell and follows the recorded neighbours back to the star. The orange
+lines are the cheapest routes from 5 well-separated entries. They merge as they near the star
+because once two routes reach the same cell, the cheapest way onward is identical. Notice that they pass through the
+ridge shadows from the first section instead of flying straight.</p>
+
+<h2>4. Comparing the search methods</h2>
+<div class="table-wrap"><table><tr><th>Method</th><th>What it answers</th><th>Cells expanded</th><th>Time</th></tr><tr><td>Full reverse flood</td><td>Cheapest route from every cell</td><td>102,400</td><td>75 ms</td></tr><tr><td>Dijkstra with early exit</td><td>Cheapest entry only</td><td>86,631</td><td>68 ms</td></tr><tr><td>A* with early exit</td><td>Cheapest entry only</td><td>85,662</td><td>65 ms</td></tr></table></div>
+<p>"Cells expanded" is how many cells each search had to finalize. Early exit stops at the first entry cell finalized,
+which is guaranteed to be the cheapest. A* also steers toward the entry edge using a lower bound on the remaining cost.</p>
+<p>On this map A* expanded 1.1% fewer cells than plain Dijkstra. The bound has to assume the rest of the route is as
+cheap as the cheapest cell anywhere, and radar makes real costs much higher than that. The full flood therefore costs about
+the same and answers far more, which is why it is the workhorse.</p>
+
+<h2>5. The minimax optimizer: where to add radars</h2>
+<img src="03_minimax.png" alt="Two maps showing the cheapest route before and after three radars are added">
+<p>The optimizer is a <strong>minimax</strong>. The defender chooses radar sites to maximize the cost of the adversary's
+cheapest route, and the adversary responds with the route that minimizes that cost:</p>
+<p><code>maximize over radar sets S &nbsp; minimize over routes p &nbsp; cost(p | S)</code></p>
+<p>The left map is the starting situation, where the cheapest route slips through a ridge shadow and costs 31,591.
+The right map shows the best 3 radars out of 16 candidate sites, which are the
+highest points in a coarse grid. The shadows have mostly closed, and the adversary's best remaining route is
+forced to cross covered ground.</p>
+<div class="table-wrap"><table><tr><th>Strategy</th><th>Method</th><th>Cheapest-route cost after placement</th><th>Increase</th><th>Gap to optimum</th></tr><tr><td>Greedy</td><td>Adds the single best radar, three times</td><td>50,789</td><td>+61%</td><td>0.45%</td></tr><tr><td>Greedy + swap</td><td>Then exchanges one radar at a time while that helps</td><td>51,019</td><td>+61%</td><td>0.00%</td></tr><tr><td>Exhaustive</td><td>Scores all 560 possible sets</td><td>51,019</td><td>+61%</td><td>0.00%</td></tr></table></div>
+<p>Every candidate set is scored by solving the adversary's route exactly. Greedy and swap refinement search the defender's
+choices approximately, while exhaustive search checks every set and provides the true optimum for comparison. Exhaustive
+search only works because this example is tiny, as the number of possible sets explodes as sites are added.</p>
+
+<h2>Limits of this demo</h2>
+<ul>
+<li>The terrain, weights and radar settings (12 km range, 15 m mast) are invented to make the algorithms visible. They say nothing about any real location or sensor.</li>
+<li>The map stops at its edge, so routes can run along the boundary in a way a real one couldn't.</li>
+<li>This is one scene from one random seed, so the numbers illustrate the method and are not a benchmark.</li>
+</ul>
+</body></html>

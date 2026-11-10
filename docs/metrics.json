@@ -1,0 +1,64 @@
+{
+  "grid_cells": 102400,
+  "grid_side_cells": 320,
+  "cell_size_m": 100.0,
+  "entry_cells": 320,
+  "routes_drawn": 5,
+  "fixed_radars": 6,
+  "radar_weight": 2.0,
+  "radar": {
+    "max_range_m": 12000.0,
+    "mast_height_m": 15.0,
+    "target_height_m": 15.0
+  },
+  "candidate_sites": 16,
+  "sensors_placed": 3,
+  "viewshed_ms_each": 50.6,
+  "search": {
+    "full_flood": {
+      "expanded": 102400,
+      "ms": 75.3
+    },
+    "dijkstra_early_exit": {
+      "expanded": 86631,
+      "ms": 68.0
+    },
+    "astar": {
+      "expanded": 85662,
+      "ms": 65.3
+    }
+  },
+  "baseline_route_cost": 31591.1,
+  "placement": {
+    "greedy": {
+      "value": 50789.4,
+      "sites": [
+        6,
+        11,
+        13
+      ],
+      "searches": 45,
+      "ms": 2847
+    },
+    "greedy_plus_swap": {
+      "value": 51018.9,
+      "sites": [
+        6,
+        10,
+        13
+      ],
+      "new_searches": 50,
+      "ms": 3178
+    },
+    "exhaustive": {
+      "value": 51018.9,
+      "sites": [
+        6,
+        10,
+        13
+      ],
+      "total_distinct_searches": 591,
+      "ms": 31703
+    }
+  }
+}

@@ -4,7 +4,7 @@ Hologram is an interactive decision-support tool for finding gaps in low-altitud
 
 I developed the production algorithms and data, and they were briefed to the Latvian Ministry of Defence and NATO.
 
-This repository is a **small, self-contained reimplementation of the core ideas on invented terrain**. The production system is private. Nothing here contains its code, data, geography, parameters or results.
+This repository is a **small, self-contained reimplementation of the core ideas on invented terrain**. The production system is private. Nothing here contains its code, data, geography, parameters or results. **To see a video of the public technical sample, see my personal website: www.yashashaw.dev**
 
 ![A cost wave spreading outward from the defended asset across synthetic terrain](docs/flood.gif)
 
